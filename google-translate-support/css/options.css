@@ -1,0 +1,15 @@
+.options .language-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, auto));
+}
+
+.options .textbox {
+  font-size: 1.5rem;
+  width: 90%;
+  padding: 10px 10px;
+  margin: 20px 0px;
+}
+
+.dim {
+  opacity: 0.1;
+}
