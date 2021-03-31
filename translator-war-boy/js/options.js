@@ -1,5 +1,5 @@
 (function() {
-  GTSdebug.log('hello, optioins js');
+  TWBdebug.log('hello, options js');
   /*
   Array.from(temp1.children)
   .filter(item => item.children.length > 1)
@@ -122,12 +122,12 @@
     { code : 'zu', desc : 'Zulu' }
   ];
 
-  function languageNodeInit(gtsConfig) {
-    //GTSdebug.log(langArr);
+  function languageNodeInit(twbConfig) {
+    //TWBdebug.log(langArr);
     langArr.forEach(lang => {
       let anchor = document.createElement('a');
       // anchor.setAttribute('href', '#');
-      if(gtsConfig.toLanguageValue == lang.code) anchor.setAttribute('class', 'active');
+      if(twbConfig.toLanguageValue == lang.code) anchor.setAttribute('class', 'active');
       anchor.setAttribute('value', lang.code);
       let text = document.createTextNode(lang.desc);
       anchor.appendChild(text);
@@ -138,19 +138,19 @@
       .forEach(a => a.addEventListener('click', (e) => {
         document.querySelector('.language-container .active').classList.remove('active');
         e.target.classList.add('active');
-        GTSdebug.log('a clicked', e);
-        gtsConfig.toLanguageValue = e.target.getAttribute('value');
-        chrome.storage.sync.set({'gtsConfig': gtsConfig});
+        TWBdebug.log('a clicked', e);
+        twbConfig.toLanguageValue = e.target.getAttribute('value');
+        chrome.storage.sync.set({'twbConfig': twbConfig});
       }));
   }//languageNodeInit
 
   let debounceTimer = null;
   let debounce = (e) => {
     let searchLanguage = e.target.value;
-    GTSdebug.log('debounce', searchLanguage);
+    TWBdebug.log('debounce', searchLanguage);
     clearTimeout(debounceTimer);
     debounceTimer = setTimeout(function() {
-      GTSdebug.log('search language', searchLanguage);
+      TWBdebug.log('search language', searchLanguage);
       let languageNodeArr = Array.from(document.querySelectorAll('.language-container a'));
       if(!searchLanguage) {
         languageNodeArr
@@ -160,7 +160,7 @@
 
       languageNodeArr
       .forEach(languageNode => {
-        GTSdebug.log(languageNode);
+        TWBdebug.log(languageNode);
         let languageFullText = languageNode.innerHTML;
         if(languageFullText.toLowerCase().indexOf(searchLanguage.toLowerCase()) >= 0) {
           languageNode.classList.remove('dim');
@@ -173,9 +173,10 @@
 
   document.querySelector('.content.options .textbox').addEventListener('keyup', debounce);
 
-  chrome.storage.sync.get('gtsConfig', function(result) {
-    GTSdebug.log('default gtsConfig', result.gtsConfig);
-    languageNodeInit(result.gtsConfig);
+  chrome.storage.sync.get('twbConfig', function({twbConfig}) {
+    TWBdebug.log('default twbConfig', twbConfig);
+    twbConfig.debug? TWBdebug.active():TWBdebug.deactive();
+    languageNodeInit(twbConfig);
   });
 
 

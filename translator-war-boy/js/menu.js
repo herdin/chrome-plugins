@@ -1,14 +1,23 @@
 (function(){
-  GTSdebug.log('hello, menu js');
+  TWBdebug.log('hello, menu js');
 
-  document.getElementById("loading")
+  document.getElementById("deploy")
   .addEventListener("click", async () => {
     let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    GTSdebug.log('active tab id -> ', tab.id);
+    TWBdebug.log('active tab id -> ', tab.id);
     chrome.scripting.executeScript({
       target: { tabId: tab.id },
       // function: googleTranslateSupportLoader,
-      files: ['js/loading.js']
+      files: ['js/deploy.js']
+    });
+    window.close();
+  });
+
+
+  document.getElementById("witnessed")
+  .addEventListener("click", () => {
+    chrome.tabs.create({
+      url: chrome.runtime.getURL('witnessed.html'),
     });
     window.close();
   });

@@ -2,7 +2,13 @@
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(150px, auto));
 }
-.logging .logging-container {
+.language-container .active {
+  /*color: #3477db;*/
+  color: #db3434;
+  font-weight: bold;
+}
+
+.witnessed .witnessed-container {
   display: grid;
   grid-auto-rows: minmax(5%, auto);
   grid-template-columns: 1fr 1fr;
