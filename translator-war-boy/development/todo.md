@@ -18,3 +18,5 @@ Now, it is time to use a translator "War Boy" on your web. You just drag or scro
 
 War Boy will immediately search them on Google translator and record everything you searched in the Witnessed section. So you can find how many times you have searched the words.
 ```
+
+1.2 test
