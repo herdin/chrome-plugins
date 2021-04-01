@@ -1,10 +1,10 @@
 (function(){
-  TWBdebug.log('hello, menu js');
+  logger.log('hello, menu js');
 
   document.getElementById("deploy")
   .addEventListener("click", async () => {
     let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    TWBdebug.log('active tab id -> ', tab.id);
+    logger.log('active tab id -> ', tab.id);
     chrome.scripting.executeScript({
       target: { tabId: tab.id },
       // function: googleTranslateSupportLoader,

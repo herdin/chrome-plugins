@@ -24,11 +24,26 @@
         </ul>
       </div>
       <div class="content options">
-        <input type="text" class="textbox" placeholder="Search languages"/>
-        <div class="language-container"></div>
+        <div class="formRow">
+          <h2>Delegating Service Configuration</h2>
+          <label class="topLabel">Delegating Service is :</label>
+          <br/>
+          <div class="select-wrapper">
+						<select id="select-service" class="option">
+            </select>
+          </div>
+        </div>
+        <div class="service" name="google" style="display:none;">
+          <input type="text" class="textbox" placeholder="Search languages"/>
+          <div class="language-container"></div>
+        </div>
+        <div class="service" name="longman" style="display:none;">
+          <input type="text" class="textbox" placeholder="Search languages"/>
+          <div class="language-container"></div>
+        </div>
       </div>
   	</div>
   </body>
-  <script src="js/twbdebug.js"></script>
+  <script src="js/logger.js"></script>
   <script src="js/options.js"></script>
 </html>

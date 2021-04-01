@@ -50,7 +50,7 @@ https://github.com/aaronpowell/db.js
 ########################
 * background.js
 * deploy.js
-* twbdebug.js
+* logger.js
 
  ########################
  # db.min.js start
@@ -62,46 +62,41 @@ https://github.com/aaronpowell/db.js
  # db.min.js end
  ########################
  */
-const TWBdebug = (function(){
-  let debug = true;
-  function active() {
-    debug = true;
-  }
-  function deactive() {
-    debug = false;
-  }
+const logger = (function(){
+  let _level = 0;
+  let _name = 'background.js';
   function log(txt, obj) {
-    if(!debug) return;
+    if(_level <= 0) return;
     let current = new Date();
-    let prefix = `${current.getFullYear()}-${(current.getMonth()+1+'').padStart(2, '0')}-${(current.getDate()+'').padStart(2, '0')}T${(current.getHours()+'').padStart(2, '0')}:${(current.getMinutes()+'').padStart(2, '0')}:${(current.getSeconds()+'').padStart(2, '0')}.${(current.getMilliseconds()+'').padStart(3, '0')} : `;
+    let prefix = `${current.getFullYear()}-${(current.getMonth()+1+'').padStart(2, '0')}-${(current.getDate()+'').padStart(2, '0')}T${(current.getHours()+'').padStart(2, '0')}:${(current.getMinutes()+'').padStart(2, '0')}:${(current.getSeconds()+'').padStart(2, '0')}.${(current.getMilliseconds()+'').padStart(3, '0')} : ${_name} : `;
     if(obj) console.log(prefix + txt, obj);
     else console.log(prefix + txt);
   }
   return {
+    get name() { return _name; },
+    set name(newName) { _name = newName; },
     log: log,
-    name: 'background',
-    active: active,
-    deactive: deactive
+    active: (settingLevel = 1) => { _level = settingLevel; },
+    deactive: () => { _level = 0; },
   }
 })();
 
-TWBdebug.log('hello, background js');
+
+logger.log('hello, background js');
 
 function onInstalledListener() {
-  TWBdebug.log('on installed..');
-  const twbConfig = {
-    url : 'https://translate.google.com/?sl=auto&op=translate',
-    from : '&text=',
-    toLanguageKey : '&tl=',
-    toLanguageValue : 'en',
-    css : 'width=500, height=500',
-    debug : false
+  logger.log('on installed..');
+  const config = {
+    delegateServiceName: 'google',
+    googleToLanguage : 'en',
+    longmanToLanguage : '/',
+    debug : true
   };
-  chrome.storage.sync.set({'twbConfig': twbConfig});
-  TWBdebug.log('default twbConfig', twbConfig);
-  chrome.storage.sync.get('twbConfig', function({twbConfig}) {
-    TWBdebug.log('default twbConfig', twbConfig);
-    twbConfig.debug? TWBdebug.active():TWBdebug.deactive();
+  logger.log('set default config', config);
+  chrome.storage.sync.set({'config': config});
+  chrome.storage.sync.get('config', function({config}) {
+    logger.log('get default config for check', config);
+    config.debug? logger.active():logger.deactive();
   });
 }
 
@@ -114,15 +109,15 @@ function openDatabase() {
 
   DATABASE_NAME_LIST_PREVIOUS.forEach(previousDatabaseName => {
     db.delete(previousDatabaseName)
-    .then(() => TWBdebug.log('database deleted.', previousDatabaseName))
+    .then(() => logger.log('database deleted.', previousDatabaseName))
     ;
   });
   let p = DROP_BEFORE_OPEN ?
-    db.delete(DATABASE_NAME).then(() => TWBdebug.log('database deleted.', DATABASE_NAME)) :
+    db.delete(DATABASE_NAME).then(() => logger.log('database deleted.', DATABASE_NAME)) :
     Promise.resolve();
 
   return p.then(() => {
-    TWBdebug.log('database open..', DATABASE_NAME);
+    logger.log('database open..', DATABASE_NAME);
     return db.open({
       server: DATABASE_NAME,
       version: 1,
@@ -140,7 +135,7 @@ function openDatabase() {
       }
     });
   }).catch(function (err) {
-    TWBdebug.log('database open error.', err);
+    logger.log('database open error.', err);
       if (err.type === 'blocked') {
           oldConnection.close();
           return err.resume;
@@ -148,20 +143,20 @@ function openDatabase() {
       throw err;
   }).then((s) => {
     SERVER = s;
-    TWBdebug.log('database opened.', DATABASE_NAME);
+    logger.log('database opened.', DATABASE_NAME);
   });
 }
 
 function isFieldEmpty(fieldName, field) {
   if(!field) {
-    TWBdebug.log(fieldName + ' is empty', field);
+    logger.log(fieldName + ' is empty', field);
     return true;
   }
   return false;
 }
 
 function putSearchTarget(searchTarget, sendResponse) {
-  TWBdebug.log('put search target ->', searchTarget);
+  logger.log('put search target ->', searchTarget);
   if(isFieldEmpty('searchTarget', searchTarget)) return;
   searchTarget = searchTarget.trim();
   const dataLimit = 100;
@@ -178,18 +173,18 @@ function putSearchTarget(searchTarget, sendResponse) {
     else                return addSearchTarget(searchTarget);
   })
   .then((saved) => {
-    TWBdebug.log('put ok.', saved);
+    logger.log('put ok.', saved);
     let response = { status : 'ok' };
     response.data = [saved];
     sendResponse(response);
     return SERVER.searchTargets.count();
   })
   .catch((err) => {
-    TWBdebug.log('put fail.', err);
+    logger.log('put fail.', err);
     sendResponse(err);
   })
   .then((count) => {
-    TWBdebug.log('count/dataLimit', count+'/'+dataLimit);
+    logger.log('count/dataLimit', count+'/'+dataLimit);
     if(dataLimit>=count) return Promise.resolve([]);
 
     return SERVER.searchTargets
@@ -201,7 +196,7 @@ function putSearchTarget(searchTarget, sendResponse) {
   .then(results => {
     results.forEach(result => {
       SERVER.searchTargets.remove(result.id)
-      .then(removed => TWBdebug.log('removed', removed));
+      .then(removed => logger.log('removed', removed));
     });
   })
   ;
@@ -235,12 +230,26 @@ function getSearchTarget(sendResponse) {
   .then(results => {
     let response = { status : 'ok' };
     response.data = results;
-    TWBdebug.log('get ok.')
+    logger.log('get ok.')
     sendResponse(response);
   })
   .catch((err) => {
-    TWBdebug.log('get fail.', err);
+    logger.log('get fail.', err);
     sendResponse(err);
+  })
+  ;
+}
+
+function deleteSearchTarget(deleteId, sendResponse) {
+  openDatabase()
+  .then(() =>
+    SERVER.searchTargets.remove(deleteId)
+  )
+  .then(removed => {
+    let response = { status : 'ok' };
+    response.data = [removed];
+    logger.log('removed', removed);
+    sendResponse(response);
   })
   ;
 }
@@ -253,43 +262,46 @@ function clearSearchTarget(sendResponse) {
   )
   .then(() => {
     let response = { status : 'ok' };
-    TWBdebug.log('clear ok.')
+    logger.log('clear ok.')
     sendResponse(response);
   })
   .catch((err) => {
-    TWBdebug.log('clear fail.', err);
+    logger.log('clear fail.', err);
     sendResponse(err);
   })
   ;
 }
 
 function onMessageListener(request, sender, sendResponse) {
-  TWBdebug.log(sender.tab ? "from a content script:" + sender.tab.url : "from the extension");
-  TWBdebug.log('request', request);
+  logger.log(sender.tab ? 'from a content script:' + sender.tab.url : 'from the extension');
+  logger.log('request', request);
   let {type} = request;
-  let response = { status : 'done' };
   switch(type) {
     case 'put':
-      putSearchTarget(request.searchTarget, sendResponse);
-      break;
+      putSearchTarget(request.searchTarget, sendResponse); break;
     case 'get':
-      getSearchTarget(sendResponse);
-      break;
+      getSearchTarget(sendResponse); break;
+    case 'delete':
+      deleteSearchTarget(request.deleteId, sendResponse); break;
     case 'clear':
-      clearSearchTarget(sendResponse);
-      break;
+      clearSearchTarget(sendResponse); break;
     default:
-      throw new Error('not applicable from ' + from);
+      throw new Error('not applicable type -> ' + type);
       break;
   }
+  // let response = { status : 'done' };
   // sendResponse(response);
+  /* https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/runtime/onMessage
+   * return true from the event listener. This keeps the sendResponse() function valid after the listener returns, so you can call it later.
+   * return a Promise from the event listener, and resolve when you have the response (or reject it in case of an error). See an example.
+   */
   return true;
 }
 
 
 openDatabase()
 .then(() => {
-  SERVER.searchTargets.query().all().execute().then(results => TWBdebug.log(results));
+  SERVER.searchTargets.query().all().execute().then(results => logger.log(results));
 })
 ;
 chrome.runtime.onInstalled.addListener(onInstalledListener);
