@@ -1,6 +1,5 @@
-### 사전 설정 기능 추가
+### 사전 설정 기능 추가 -> 완료
 * https://www.ldoceonline.com/
-
 
 ### pdf 에서 쓰고싶다.
 #### context menu (마우스 오른쪽 클릭 메뉴) 추가

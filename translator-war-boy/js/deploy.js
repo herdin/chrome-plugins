@@ -1,6 +1,6 @@
 (function() {
   const logger = (function(){
-    let _level = 0;
+    let _level = 1;
     let _name = 'deploy.js';
     function log(txt, obj) {
       if(_level <= 0) return;
@@ -24,40 +24,56 @@
     LONGMAN: 'longman',
   };
 
-  logger.log('preparing deploy..');
-  const indicatorId = 'translatorWarBoyIndicator';
-  if(document.getElementById(indicatorId)) {
-    logger.log('already deployed.');
-    return;
-  }
-  let indicator = document.createElement('span');
-  indicator.setAttribute('id', indicatorId);
-  document.body.appendChild(indicator);
-  logger.log('indicator append done.');
-
   chrome.storage.sync.get('config', ({config}) => {
     logger.log('get config -> ', config);
-    config.debug? logger.active():logger.deactive();
-    /* if current url not end with .pdf?
-     * then add web listener
-     */
-    // let listener = getListener(config);
-    let listener = getDefaultListener(config);
+    config.debug?
+      logger.active():
+      logger.deactive();
 
-    document.addEventListener('dblclick', listener, false);
-    document.addEventListener('mouseup', listener, false);
-    /* else do nothing
-     * because background contextMenus.onClicked listener do listen
-     */
+    (location.href.indexOf('.pdf') > 0)?
+      pdfDeploy(config):
+      webDeploy(config);
   });
 
-  function getListener(config) {
-    switch(config.delegateServiceName) {
-      case DELEGATE_SERVICE.GOOGLE:  return googleListener(config);
-      case DELEGATE_SERVICE.LONGMAN: return longmanListener(config);
-      default: throw new Error('not applicable service name -> ' + config.delegateServiceName);
+
+  function pdfDeploy(config) {
+    logger.log('pdf deploy.');
+
+    sendMessage({ type: 'pdf' }, (response) => logger.log('pdf response -> ', response));
+    let listener = getDefaultListener(config);
+
+    setInterval(() => {
+      chrome.storage.sync.get('polling', function({polling}) {
+        logger.log('get polling -> ', polling);
+        if(!polling.selectionText) return;
+        
+        let selectionText = polling.selectionText;
+        document.getSelection().toString = () => selectionText;
+        listener();
+        polling.selectionText = '';
+        chrome.storage.sync.set({'polling': polling});
+      });
+    }, config.pollingInterval);
+  }
+
+  function webDeploy(config) {
+    logger.log('web deploy.');
+
+    const indicatorId = 'translatorWarBoyIndicator';
+    if(document.getElementById(indicatorId)) {
+      logger.log('already deployed.');
+      return;
     }
-  }//getListener
+
+    let indicator = document.createElement('span');
+    indicator.setAttribute('id', indicatorId);
+    document.body.appendChild(indicator);
+    logger.log('indicator append done.');
+
+    let listener = getDefaultListener(config);
+    document.addEventListener('dblclick', listener, false);
+    document.addEventListener('mouseup', listener, false);
+  }
 
   //usage in listener
   let popup;
@@ -121,55 +137,6 @@
     };
   }
 
-
-  function googleListener(config) {
-    logger.log('google listener', config);
-    const googleConfig = {
-      url : 'https://translate.google.com/?sl=auto&op=translate',
-      from : '&text=',
-      toLanguageKey : '&tl=',
-      toLanguageValue : config.googleToLanguage,
-      css : 'width=500, height=500',
-    };
-
-    return function() {
-      clearTimeout(debounce);
-      debounce = setTimeout(() => {
-        let selectionInfo = getSelectionInfo();
-        if(!selectionInfo.valid) return;
-        sendMessage({ type: 'put', searchTarget: selectionInfo.selection }, (response) => logger.log('put response -> ', response));
-
-        let targetUrl =
-          googleConfig.url +
-          googleConfig.from + selectionInfo.selection +
-          googleConfig.toLanguageKey + googleConfig.toLanguageValue;
-        popup = window.open(targetUrl, 'translator-war-boy-popup', googleConfig.css);
-      }, 200);
-    };
-  }//googleListener
-
-  function longmanListener(config) {
-    logger.log('longman listener', config);
-
-    const longmanConfig = {
-     url : 'https://www.ldoceonline.com/dictionary',
-     toLanguageValue : config.longmanToLanguage,
-     css : 'width=500, height=500',
-    };
-
-    return function() {
-      clearTimeout(debounce);
-      debounce = setTimeout(() => {
-        let selectionInfo = getSelectionInfo();
-        if(!selectionInfo.valid) return;
-        sendMessage({ type: 'put', searchTarget: selectionInfo.selection }, (response) => logger.log('put response -> ', response));
-
-        let targetUrl = longmanConfig.url + longmanConfig.toLanguageValue + selectionInfo.selection;
-        popup = window.open(targetUrl, 'translator-war-boy-popup', longmanConfig.css);
-      }, 200);
-    };
-  }//longmanListener
-
   function getSelectionInfo() {
     let selectionResult = {};
     let selection = document.getSelection().toString();
@@ -186,7 +153,7 @@
 
   function sendMessage(messageObject, callback) {
     chrome.runtime.sendMessage(messageObject, (response) => {
-        logger.log('put response -> ', response);
+        logger.log('send response -> ', response);
         if(callback) callback(response);
     });
   }

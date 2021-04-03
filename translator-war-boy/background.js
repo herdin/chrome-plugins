@@ -63,7 +63,7 @@ https://github.com/aaronpowell/db.js
  ########################
  */
 const logger = (function(){
-  let _level = 0;
+  let _level = 1;
   let _name = 'background.js';
   function log(txt, obj) {
     if(_level <= 0) return;
@@ -81,7 +81,6 @@ const logger = (function(){
   }
 })();
 
-
 logger.log('hello, background js');
 
 function onInstalledListener() {
@@ -90,13 +89,21 @@ function onInstalledListener() {
     delegateServiceName: 'google',
     googleToLanguage : 'en',
     longmanToLanguage : '/',
-    debug : true
+    pollingInterval : 200,
+    debug : false
   };
   logger.log('set default config', config);
   chrome.storage.sync.set({'config': config});
   chrome.storage.sync.get('config', function({config}) {
     logger.log('get default config for check', config);
     config.debug? logger.active():logger.deactive();
+  });
+
+  const polling = { selectionText: '' };
+  logger.log('set default polling', polling);
+  chrome.storage.sync.set({'polling': polling});
+  chrome.storage.sync.get('polling', function({polling}) {
+    logger.log('get default polling for check', polling);
   });
 }
 
@@ -115,24 +122,24 @@ function openDatabase() {
   let p = DROP_BEFORE_OPEN ?
     db.delete(DATABASE_NAME).then(() => logger.log('database deleted.', DATABASE_NAME)) :
     Promise.resolve();
-
+  let bloodBagSchema = {
+    searchTargets: {
+      key: {
+        keyPath: 'id',
+        autoIncrement: true
+      },
+      indexes: { // Optionally add indexes
+        searchTarget: {},
+        updated: {}
+      }
+    }
+  };
   return p.then(() => {
     logger.log('database open..', DATABASE_NAME);
     return db.open({
       server: DATABASE_NAME,
       version: 1,
-      schema: {
-        searchTargets: {
-          key: {
-            keyPath: 'id',
-            autoIncrement: true
-          },
-          indexes: { // Optionally add indexes
-            searchTarget: {},
-            updated: {}
-          }
-        }
-      }
+      schema: bloodBagSchema
     });
   }).catch(function (err) {
     logger.log('database open error.', err);
@@ -167,43 +174,37 @@ function putSearchTarget(searchTarget, sendResponse) {
     .query('searchTarget')
     .only(searchTarget)
     .execute()
-  )
-  .then((results) => {
+  ).then((results) => {
     if(results.length)  return updateSearchTarget(results[0]);
     else                return addSearchTarget(searchTarget);
-  })
-  .then((saved) => {
+  }).then((saved) => {
     logger.log('put ok.', saved);
-    let response = { status : 'ok' };
+    let response = { status : 'ok', from : 'put' };
     response.data = [saved];
     sendResponse(response);
     return SERVER.searchTargets.count();
-  })
-  .catch((err) => {
+  }).catch((err) => {
     logger.log('put fail.', err);
     sendResponse(err);
-  })
-  .then((count) => {
+  }).then((count) => {
     logger.log('count/dataLimit', count+'/'+dataLimit);
     if(dataLimit>=count) return Promise.resolve([]);
-
     return SERVER.searchTargets
     .query()
     .all()
     .limit(0, count-dataLimit)
     .execute()
-  })
-  .then(results => {
+  }).then(results => {
     results.forEach(result => {
       SERVER.searchTargets.remove(result.id)
       .then(removed => logger.log('removed', removed));
     });
-  })
-  ;
+  });
 }
 
 let addSearchTarget = (searchTarget) => {
-  return SERVER.searchTargets
+  return
+  SERVER.searchTargets
   .add({
     searchTarget: searchTarget,
     count: 1,
@@ -215,8 +216,7 @@ let updateSearchTarget = (searchTargetObj) => {
   searchTargetObj.count = searchTargetObj.count + 1;
   searchTargetObj.updated = Date.now();
   return SERVER.searchTargets
-  .update(searchTargetObj)
-  ;
+  .update(searchTargetObj);
 };
 
 function getSearchTarget(sendResponse) {
@@ -226,32 +226,27 @@ function getSearchTarget(sendResponse) {
     .query()
     .all()
     .execute()
-  )
-  .then(results => {
-    let response = { status : 'ok' };
+  ).then(results => {
+    let response = { status : 'ok', from : 'get' };
     response.data = results;
     logger.log('get ok.')
     sendResponse(response);
-  })
-  .catch((err) => {
+  }).catch((err) => {
     logger.log('get fail.', err);
     sendResponse(err);
-  })
-  ;
+  });
 }
 
 function deleteSearchTarget(deleteId, sendResponse) {
   openDatabase()
   .then(() =>
     SERVER.searchTargets.remove(deleteId)
-  )
-  .then(removed => {
-    let response = { status : 'ok' };
+  ).then(removed => {
+    let response = { status : 'ok', from : 'delete' };
     response.data = [removed];
     logger.log('removed', removed);
     sendResponse(response);
-  })
-  ;
+  });
 }
 
 function clearSearchTarget(sendResponse) {
@@ -259,17 +254,14 @@ function clearSearchTarget(sendResponse) {
   .then(() =>
     SERVER.searchTargets
     .clear()
-  )
-  .then(() => {
-    let response = { status : 'ok' };
+  ).then(() => {
+    let response = { status : 'ok', from : 'clear' };
     logger.log('clear ok.')
     sendResponse(response);
-  })
-  .catch((err) => {
+  }).catch((err) => {
     logger.log('clear fail.', err);
     sendResponse(err);
-  })
-  ;
+  });
 }
 
 function onMessageListener(request, sender, sendResponse) {
@@ -285,24 +277,40 @@ function onMessageListener(request, sender, sendResponse) {
       deleteSearchTarget(request.deleteId, sendResponse); break;
     case 'clear':
       clearSearchTarget(sendResponse); break;
+    case 'pdf':
+      chrome.contextMenus.update('pass_to_warboy', { visible: true });
+      Promise.resolve().then(() => sendResponse({ status : 'ok', from: 'pdf' }));
+      break;
     default:
       throw new Error('not applicable type -> ' + type);
-      break;
   }
   // let response = { status : 'done' };
   // sendResponse(response);
   /* https://developer.mozilla.org/en-US/docs/Mozilla/Add-ons/WebExtensions/API/runtime/onMessage
-   * return true from the event listener. This keeps the sendResponse() function valid after the listener returns, so you can call it later.
+   * return true      from the event listener. This keeps the sendResponse() function valid after the listener returns, so you can call it later.
    * return a Promise from the event listener, and resolve when you have the response (or reject it in case of an error). See an example.
    */
   return true;
 }
 
+// openDatabase()
+// .then(() => {
+//   SERVER.searchTargets.query().all().execute().then(results => logger.log(results));
+// });
 
-openDatabase()
-.then(() => {
-  SERVER.searchTargets.query().all().execute().then(results => logger.log(results));
-})
-;
 chrome.runtime.onInstalled.addListener(onInstalledListener);
 chrome.runtime.onMessage.addListener(onMessageListener);
+
+chrome.contextMenus.create({
+  id: 'pass_to_warboy',
+  title: 'pass to warboy',
+  contexts: ['selection'],
+  visible: false,
+});
+
+chrome.contextMenus.onClicked.addListener((info, tab) => {
+  logger.log('info -> ', info);
+  logger.log('tab -> ', tab);
+  let polling = { selectionText : info.selectionText.toLowerCase() };
+  chrome.storage.sync.set({'polling': polling});
+});

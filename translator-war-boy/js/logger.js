@@ -1,5 +1,5 @@
 const logger = (function(){
-  let _level = 0;
+  let _level = 1;
   let _name = 'module';
   function log(txt, obj) {
     if(_level <= 0) return;

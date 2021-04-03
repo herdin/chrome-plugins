@@ -21,6 +21,17 @@ changeColor.addEventListener("click", async () => {
   });
 });
 
+document.querySelector('#deployScript')
+.addEventListener('click', async () => {
+  let [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  console.log('active tab id -> ', tab.id);
+  chrome.scripting.executeScript({
+    target: { tabId: tab.id },
+    files: ['deploy.js']
+  });
+  window.close();
+});
+
 // The body of this function will be executed as a content script inside the
 // current page
 function setPageBackgroundColor() {
