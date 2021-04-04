@@ -90,7 +90,7 @@ function onInstalledListener() {
     googleToLanguage : 'en',
     longmanToLanguage : '/',
     pollingInterval : 200,
-    debug : false
+    debug : true
   };
   logger.log('set default config', config);
   chrome.storage.sync.set({'config': config});
@@ -105,6 +105,7 @@ function onInstalledListener() {
   chrome.storage.sync.get('polling', function({polling}) {
     logger.log('get default polling for check', polling);
   });
+  logger.log('on installed done.');
 }
 
 let SERVER = null;
@@ -138,7 +139,7 @@ function openDatabase() {
     logger.log('database open..', DATABASE_NAME);
     return db.open({
       server: DATABASE_NAME,
-      version: 1,
+      version: 2,
       schema: bloodBagSchema
     });
   }).catch(function (err) {
@@ -293,24 +294,28 @@ function onMessageListener(request, sender, sendResponse) {
   return true;
 }
 
-// openDatabase()
-// .then(() => {
-//   SERVER.searchTargets.query().all().execute().then(results => logger.log(results));
-// });
+openDatabase()
+.then(() => {
+  SERVER.searchTargets.query().all().execute().then(results => logger.log('select -> ', results));
+});
 
 chrome.runtime.onInstalled.addListener(onInstalledListener);
 chrome.runtime.onMessage.addListener(onMessageListener);
 
+logger.log('add context menus');
 chrome.contextMenus.create({
   id: 'pass_to_warboy',
   title: 'pass to warboy',
   contexts: ['selection'],
-  visible: false,
+  visible: true,
 });
 
+logger.log('add context menus on click listener');
 chrome.contextMenus.onClicked.addListener((info, tab) => {
+  logger.log('context menus on clicked');
   logger.log('info -> ', info);
   logger.log('tab -> ', tab);
   let polling = { selectionText : info.selectionText.toLowerCase() };
+  putSearchTarget(info.selectionText, () => {});
   chrome.storage.sync.set({'polling': polling});
 });
