@@ -19,12 +19,12 @@
       searchTargetInfoArr.forEach(searchTargetInfo => {
         let divSearchTarget = document.createElement('div');
         divSearchTarget.setAttribute('data-id', searchTargetInfo.id);
-        divSearchTarget.setAttribute('data-searchTarget', searchTargetInfo.searchTarget);
+        divSearchTarget.setAttribute('data-target', searchTargetInfo.target);
         divSearchTarget.setAttribute('data-count', searchTargetInfo.count);
         divSearchTarget.setAttribute('data-updated', searchTargetInfo.updated);
-        let searchTarget = searchTargetInfo.searchTarget;
-        searchTarget = (searchTarget.length > 20)? searchTarget.substring(0, 20) + '...' : searchTarget;
-        divSearchTarget.appendChild(document.createTextNode(searchTarget));
+        let target = searchTargetInfo.target;
+        target = (target.length > 20)? target.substring(0, 20) + '...' : target;
+        divSearchTarget.appendChild(document.createTextNode(target));
         document.querySelector(WITNESSED_CONTAINER_CLASS_SELECTOR).appendChild(divSearchTarget);
         let divCount = document.createElement('div');
         divCount.appendChild(document.createTextNode(searchTargetInfo.count));

@@ -1,62 +1,109 @@
 (function() {
+
   const logger = (function(){
+    let _loggingCount = 0;
+    let _loggingLimit = 10;
+    /* level = 0, deactive
+     * level = 1, active
+     * level > 1, not implements
+     */
     let _level = 1;
     let _name = 'deploy.js';
+    function clear() {
+      if(_loggingLimit > 0) {
+        if(console && ++_loggingCount > _loggingLimit) {
+          console.clear();
+          _loggingCount = 0;
+        }
+      }
+    }
     function log(txt, obj) {
+      clear();
       if(_level <= 0) return;
       let current = new Date();
       let prefix = `${current.getFullYear()}-${(current.getMonth()+1+'').padStart(2, '0')}-${(current.getDate()+'').padStart(2, '0')}T${(current.getHours()+'').padStart(2, '0')}:${(current.getMinutes()+'').padStart(2, '0')}:${(current.getSeconds()+'').padStart(2, '0')}.${(current.getMilliseconds()+'').padStart(3, '0')} : ${_name} : `;
       if(obj) console.log(prefix + txt, obj);
       else console.log(prefix + txt);
     }
+
     return {
+      active: (settingLevel = 1) => { _level = settingLevel; },
+      deactive: () => { _level = 0; },
+      get loggingLimit() { return _loggingLimit; },
+      set loggingLimit(newLoggingLimit = 100) { _loggingLimit = newLoggingLimit; },
       get name() { return _name; },
       set name(newName) { _name = newName; },
       log: log,
-      active: (settingLevel = 1) => { _level = settingLevel; },
-      deactive: () => { _level = 0; },
     }
   })();
 
   //in [options.js], must mathching with DELEGATE_SERVICE
   const DELEGATE_SERVICE = {
-    GOOGLE: 'google',
-    LONGMAN: 'longman',
+    GOOGLE: {
+      name: 'google',
+      popupConfig: googlePopupConfigMaker
+    },
+    LONGMAN: {
+      name: 'longman',
+      popupConfig: longmanPopupConfigMaker
+    },
   };
 
+  const INTERVAL = {
+    POLLING_STORAGE_FOR_DELAYED_CONFIG: 5000,
+    POLLING_STORAGE_FOR_SELECTION_TEXT: 500,
+  };
+
+  //usage in default listener
+  let popup;
+  let debounce = null;
+  let delayedConfig = null;
+
   chrome.storage.sync.get('config', ({config}) => {
-    logger.log('get config -> ', config);
+    logger.log('get config for init -> ', config);
+
     config.debug?
       logger.active():
       logger.deactive();
 
+    delayedConfig = config;
+    pollingStorageForDelayedConfig();
+
     (location.href.indexOf('.pdf') > 0)?
-      pdfDeploy(config):
-      webDeploy(config);
+      pdfDeploy():
+      webDeploy();
   });
 
+  function pollingStorageForDelayedConfig() {
+    setInterval(() => {
+      chrome.storage.sync.get('config', ({config}) => {
+        logger.log('get config for interval -> ', config);
+        delayedConfig = config;
+      });
+    }, INTERVAL.POLLING_STORAGE_FOR_DELAYED_CONFIG);
+  }
 
-  function pdfDeploy(config) {
+  function pdfDeploy() {
     logger.log('pdf deploy.');
 
     sendMessage({ type: 'pdf' }, (response) => logger.log('pdf response -> ', response));
-    let listener = getDefaultListener(config);
+    let listener = getDefaultListener();
 
     setInterval(() => {
-      chrome.storage.sync.get('polling', function({polling}) {
-        logger.log('get polling -> ', polling);
+      chrome.storage.sync.get(['polling'], function({polling}) {
         if(!polling.selectionText) return;
-        
-        let selectionText = polling.selectionText;
+        logger.log('get polling -> ', polling);
+
+        let selectionText = decodeURI(polling.selectionText);
         document.getSelection().toString = () => selectionText;
         listener();
         polling.selectionText = '';
         chrome.storage.sync.set({'polling': polling});
       });
-    }, config.pollingInterval);
+    }, INTERVAL.POLLING_STORAGE_FOR_SELECTION_TEXT);
   }
 
-  function webDeploy(config) {
+  function webDeploy() {
     logger.log('web deploy.');
 
     const indicatorId = 'translatorWarBoyIndicator';
@@ -70,35 +117,23 @@
     document.body.appendChild(indicator);
     logger.log('indicator append done.');
 
-    let listener = getDefaultListener(config);
+    let listener = getDefaultListener();
     document.addEventListener('dblclick', listener, false);
     document.addEventListener('mouseup', listener, false);
   }
 
-  //usage in listener
-  let popup;
-  let debounce = null;
-
-  function getDefaultListener(config) {
-    let popupConfig = null;
-    switch(config.delegateServiceName) {
-      case DELEGATE_SERVICE.GOOGLE: popupConfig = googlePopupConfigMaker(config); break;
-      case DELEGATE_SERVICE.LONGMAN: popupConfig = longmanPopupConfigMaker(config); break;
-      default: throw new Error('not applicable service name -> ' + config.delegateServiceName);
-    }
-
+  function getDefaultListener() {
     return function() {
-      clearTimeout(debounce);
-      debounce = setTimeout(() => {
-        let selectionInfo = getSelectionInfo();
-        if(!selectionInfo.valid) return;
-        sendMessage({ type: 'put', searchTarget: selectionInfo.selection }, (response) => logger.log('put response -> ', response));
+      logger.log('delayed config -> ', delayedConfig);
+      let popupConfig = DELEGATE_SERVICE[delayedConfig.delegateServiceName.toUpperCase()].popupConfig(delayedConfig);
+      let selectionInfo = getSelectionInfo();
+      if(!selectionInfo.valid) return;
+      sendMessage({ type: 'put', searchTarget: selectionInfo.selection }, (response) => logger.log('put response -> ', response));
 
-        popupConfig.searchTarget= selectionInfo.selection;
-        let targetUrl = popupConfig.targetUrl;
-        let css = popupConfig.css;
-        popup = window.open(targetUrl, 'translator-war-boy-popup', css);
-      }, 200);
+      popupConfig.searchTarget= selectionInfo.selection;
+      let targetUrl = popupConfig.targetUrl;
+      let css = popupConfig.css;
+      popup = window.open(encodeURI(targetUrl), 'translator-war-boy-popup', css);
     };
   }
 
@@ -140,7 +175,6 @@
   function getSelectionInfo() {
     let selectionResult = {};
     let selection = document.getSelection().toString();
-    logger.log('selection', selection);
     if(!selection || !selection.trim()) {
        if(popup) popup.close();
        selectionResult.valid = false;
@@ -148,6 +182,8 @@
       selectionResult.valid = true;
       selectionResult.selection = selection.trim();
     }
+
+    logger.log('selection info', selectionResult);
     return selectionResult;
   }
 
