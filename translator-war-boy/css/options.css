@@ -20,3 +20,11 @@
 .dim {
   opacity: 0.1;
 }
+
+/************************
+* about
+*************************/
+.about .donation-container {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, auto));
+}
