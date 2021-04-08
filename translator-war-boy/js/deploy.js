@@ -86,7 +86,7 @@
   function pdfDeploy() {
     logger.log('pdf deploy.');
 
-    sendMessage({ type: 'pdf' }, (response) => logger.log('pdf response -> ', response));
+    sendMessage({ type: 'pdf', visible: true }, (response) => logger.log('pdf response -> ', response));
     let listener = getDefaultListener();
 
     setInterval(() => {
@@ -105,6 +105,8 @@
 
   function webDeploy() {
     logger.log('web deploy.');
+
+    sendMessage({ type: 'pdf', visible: false }, (response) => logger.log('pdf response -> ', response));
 
     const indicatorId = 'translatorWarBoyIndicator';
     if(document.getElementById(indicatorId)) {
@@ -161,7 +163,7 @@
     return {
       _searchTarget : '',
       set searchTarget(setSearchTarget) {
-        _searchTarget = setSearchTarget;
+        _searchTarget = setSearchTarget.toLowerCase();
       },
       get targetUrl() {
         return baseUrl + mode + _searchTarget;

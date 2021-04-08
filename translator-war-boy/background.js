@@ -143,54 +143,66 @@ function deleteDatabase(databaseNameArr) {
   .catch((err) => logger.log('database deleted fail. reason -> ', err));
 }
 
-
 function onInstalledListener() {
-  const onInstalledLog = 'on installed.. ';
+  const logging = (function (){
+    let _div = '';
+    return {
+      init: (div) => {
+        _div = div;
+        logger.log(`on installed, ${_div} init..`);
+      },
+      process: (div, obj) => {
+        (obj)?
+          logger.log(`on installed, ${_div} process.. ${div}`, obj):
+          logger.log(`on installed, ${_div} process.. ${div}`);
+      },
+      done: () => logger.log(`on installed, ${_div} init done.`),
+    };
+  })();
+  // const
   Promise.resolve()
   .then(() => {
-    logger.log(onInstalledLog);
-  }).then(() => {
-    logger.log(onInstalledLog + 'config setting..');
+    logging.init('config');
     const config = {
       delegateServiceName: 'google',
       googleToLanguage : 'en',
       longmanToLanguage : '/',
       debug : true
     };
-    logger.log(onInstalledLog + 'set default config', config);
+    logging.process('default config set');
     chrome.storage.sync.set({'config': config});
     chrome.storage.sync.get('config', function({config}) {
-      logger.log(onInstalledLog + 'get default config for check', config);
+      logging.process('default config set check', config);
       config.debug? logger.active():logger.deactive();
     });
-    logger.log(onInstalledLog + 'config setting done.');
+    logging.done();
   }).then(() => {
-    logger.log(onInstalledLog + 'polling data setting..');
+    logging.init('polling');
+
     const polling = { selectionText: '' };
-    logger.log(onInstalledLog + 'set default polling', polling);
+    logging.process('default polling set');
     chrome.storage.sync.set({'polling': polling});
     chrome.storage.sync.get('polling', function({polling}) {
-      logger.log(onInstalledLog + 'get default polling for check', polling);
+      logging.process('default polling set check', polling);
     });
-    logger.log(onInstalledLog + 'polling data setting done.');
+    logging.done();
   }).then(() => {
-    logger.log(onInstalledLog + 'database init..');
-
-    logger.log(onInstalledLog + 'database delete..');
+    logging.init('database');
+    logging.process('delete database');
     deleteDatabase(DATABASE_CONFIG.PREVIOUS_NAME_ARR);
     if(DATABASE_CONFIG.CREATE_MODE) deleteDatabase(DATABASE_CONFIG.CURRENT_NAME_ARR);
 
-    logger.log(onInstalledLog + 'database create..');
+    logging.process('create database');
     let db = new Dexie(DATABASE_CONFIG.CURRENT_NAME_ARR);
     db.version(1).stores(DATABASE_CONFIG.SCHEMA.BLOODBAG);
-    logger.log(onInstalledLog + 'database init done.');
+    logging.done();
   }).then(() => {
-    logger.log(onInstalledLog + 'context menu init..');
-    logger.log(onInstalledLog + 'remove context menus..');
+    logging.init('context menus');
+    logging.process('remove context menu');
     chrome.contextMenus.remove(CONTEXT_MENU_ID, () => {
       let lastError = chrome.runtime.lastError;
-      if(lastError) logger.log(onInstalledLog + 'remove context menu failed.', lastError);
-      logger.log(onInstalledLog + 'add context menus..');
+      if(lastError) logging.process('remove context menu failed.', lastError.message);
+      logging.process('add context menus');
 
       chrome.contextMenus.create({
         id: CONTEXT_MENU_ID,
@@ -199,7 +211,7 @@ function onInstalledListener() {
         visible: false,
       });
     });
-    logger.log('context menu init done.');
+    logging.done();
   }).then(() => {
     logger.log('on installed done.');
   }).catch((err) => {
@@ -308,7 +320,8 @@ function onMessageListener(request, sender, sendResponse) {
     case 'clear':
       clearSearchTarget(sendResponse); break;
     case 'pdf':
-      chrome.contextMenus.update('pass_to_warboy', { visible: true });
+      chrome.contextMenus.update('pass_to_warboy', { visible: request.visible });
+      if(!request.visible) logger.log('init polling', { selectionText : '' });
       Promise.resolve().then(() => sendResponse({ status : 'ok', from: 'pdf' }));
       break;
     default:
@@ -323,7 +336,10 @@ function onMessageListener(request, sender, sendResponse) {
   return true;
 }
 
+logger.log('add on intalled listener');
 chrome.runtime.onInstalled.addListener(onInstalledListener);
+
+logger.log('add on message listener');
 chrome.runtime.onMessage.addListener(onMessageListener);
 
 logger.log('add context menus on click listener');
