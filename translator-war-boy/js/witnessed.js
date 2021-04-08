@@ -1,4 +1,5 @@
 (function() {
+  logger.name = 'witnessed.js';
   logger.log('hello, witnessed js');
   const WITNESSED_CONTAINER_CLASS_SELECTOR = '.witnessed-container';
   init();
