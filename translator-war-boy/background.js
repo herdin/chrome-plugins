@@ -23,13 +23,7 @@ https://chrome.google.com/webstore/devconsole/
 https://developer.chrome.com/docs/extensions/
 
 *************************
-* icons
-*************************
-https://www.flaticon.com/free-icon/google_814187?term=google%20translate&page=1&position=25&page=1&position=25&related_id=814187&origin=search
-https://dribbble.com/shots/9701304-War-Boy/attachments/1730685?mode=media
-
-*************************
-* web store description
+* web store description *
 *************************
 We are translator war boys!!
 You scroll unknown SENTENCES!!
@@ -38,15 +32,47 @@ Witness SENTENCES!!
 Witness You!!
 Witnessed!!
 
-
-While Web Browsing, You may contact with unknown sentences, or words.
-
-Don't hesitate, just deploy *translator war boy* on your web.
-And just drag/scroll it!
-
+While web browsing, you may face unknown sentences or words.
+Don't hesitate, just deploy "War Boy" on your web. and just drag and scroll!
 Translator War Boy will immediately search it on google translating service for you and WITNESSED for you.
-
 Every time You wonder how much You searched, using *Witnessed* menu.
+
+***************
+* instruction *
+***************
+
+** setting
+1. select google/longman
+2. select language
+
+** web mode
+1. use *deploy*
+2. drag or scroll search word
+
+** pdf mode
+1. use *deploy*
+2. drag or scroll search word
+3. show context menu (use mouse right button) and click *translate*
+
+*******************
+* version history *
+*******************
+
+** version 1.2
+- longman dictionary feature
+- PDF Support
+
+** version 1.1
+- hotfix
+
+** version 1.0
+- first release
+
+*************************
+* icons
+*************************
+https://www.flaticon.com/free-icon/google_814187?term=google%20translate&page=1&position=25&page=1&position=25&related_id=814187&origin=search
+https://dribbble.com/shots/9701304-War-Boy/attachments/1730685?mode=media
 
 *************************
 * db.js
@@ -63,7 +89,7 @@ https://github.com/aaronpowell/db.js
 
 const logger = (function(){
   let _loggingCount = 0;
-  let _loggingLimit = 10;
+  let _loggingLimit = 50;
   /* level = 0, deactive
    * level = 1, active
    * level > 1, not implements
@@ -100,20 +126,23 @@ const logger = (function(){
 
 logger.log('hello, background js');
 
-let createMode = false;
-const previouseDatabaseNameList = ['googleTranslatingSupportData'];
-const currentDatabaseName = 'bloodBag';
+/* database config */
+const DATABASE_CONFIG = {
+  CURRENT_NAME_ARR: ['bloodBag'],
+  PREVIOUS_NAME_ARR: ['googleTranslatingSupportData'],
+  CREATE_MODE: false,
+  SCHEMA: {
+    BLOODBAG: { searchTargetInfo: '++id, target' }
+  }
+};
+const CONTEXT_MENU_ID = 'pass_to_warboy';
 
-deleteDatabase(previouseDatabaseNameList);
-if(createMode) deleteDatabase(currentDatabaseName);
-
-function deleteDatabase(databaseName) {
-  Dexie.delete(databaseName)
-  .then(() => logger.log('database deleted.', databaseName))
+function deleteDatabase(databaseNameArr) {
+  Dexie.delete(databaseNameArr)
+  .then(() => logger.log('database deleted.', databaseNameArr))
   .catch((err) => logger.log('database deleted fail. reason -> ', err));
 }
 
-const BLOODBAG_SCHEMA = { searchTargetInfo: '++id, target' };
 
 function onInstalledListener() {
   const onInstalledLog = 'on installed.. ';
@@ -126,7 +155,7 @@ function onInstalledListener() {
       delegateServiceName: 'google',
       googleToLanguage : 'en',
       longmanToLanguage : '/',
-      debug : false
+      debug : true
     };
     logger.log(onInstalledLog + 'set default config', config);
     chrome.storage.sync.set({'config': config});
@@ -146,9 +175,31 @@ function onInstalledListener() {
     logger.log(onInstalledLog + 'polling data setting done.');
   }).then(() => {
     logger.log(onInstalledLog + 'database init..');
-    let db = new Dexie(currentDatabaseName);
-    db.version(1).stores(BLOODBAG_SCHEMA);
+
+    logger.log(onInstalledLog + 'database delete..');
+    deleteDatabase(DATABASE_CONFIG.PREVIOUS_NAME_ARR);
+    if(DATABASE_CONFIG.CREATE_MODE) deleteDatabase(DATABASE_CONFIG.CURRENT_NAME_ARR);
+
+    logger.log(onInstalledLog + 'database create..');
+    let db = new Dexie(DATABASE_CONFIG.CURRENT_NAME_ARR);
+    db.version(1).stores(DATABASE_CONFIG.SCHEMA.BLOODBAG);
     logger.log(onInstalledLog + 'database init done.');
+  }).then(() => {
+    logger.log(onInstalledLog + 'context menu init..');
+    logger.log(onInstalledLog + 'remove context menus..');
+    chrome.contextMenus.remove(CONTEXT_MENU_ID, () => {
+      let lastError = chrome.runtime.lastError;
+      if(lastError) logger.log(onInstalledLog + 'remove context menu failed.', lastError);
+      logger.log(onInstalledLog + 'add context menus..');
+
+      chrome.contextMenus.create({
+        id: CONTEXT_MENU_ID,
+        title: 'translate',
+        contexts: ['selection'],
+        visible: false,
+      });
+    });
+    logger.log('context menu init done.');
   }).then(() => {
     logger.log('on installed done.');
   }).catch((err) => {
@@ -165,8 +216,8 @@ function isFieldEmpty(fieldName, field) {
 }
 
 function getDb()  {
-  let db = new Dexie(currentDatabaseName);
-  db.version(1).stores(BLOODBAG_SCHEMA);
+  let db = new Dexie(DATABASE_CONFIG.CURRENT_NAME_ARR);
+  db.version(1).stores(DATABASE_CONFIG.SCHEMA.BLOODBAG);
   return db;
 }
 function putSearchTarget(searchTarget, sendResponse) {
@@ -274,14 +325,6 @@ function onMessageListener(request, sender, sendResponse) {
 
 chrome.runtime.onInstalled.addListener(onInstalledListener);
 chrome.runtime.onMessage.addListener(onMessageListener);
-
-logger.log('add context menus');
-chrome.contextMenus.create({
-  id: 'pass_to_warboy',
-  title: 'translate',
-  contexts: ['selection'],
-  visible: false,
-});
 
 logger.log('add context menus on click listener');
 chrome.contextMenus.onClicked.addListener((info, tab) => {
