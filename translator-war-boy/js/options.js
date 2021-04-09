@@ -10,7 +10,7 @@
 
   chrome.storage.sync.get('config', function({config}) {
     logger.log('get config', config);
-    config.debug? logger.active():logger.deactive();
+    logger.config = config;
     init(config);
   });
 
@@ -21,7 +21,6 @@
     initService(configuredServiceName, config);
 
     let selectService = document.querySelector('#select-service');
-
     //select service option init
     for(key in DELEGATE_SERVICE) {
       let delegateServiceName = DELEGATE_SERVICE[key];

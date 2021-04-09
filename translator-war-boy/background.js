@@ -95,7 +95,7 @@ const logger = (function(){
    * level > 1, not implements
    */
   let _level = 1;
-  let _name = 'background.js';
+  let _name = 'logger.js';
   function clear() {
     if(_loggingLimit > 0) {
       if(console && ++_loggingCount > _loggingLimit) {
@@ -107,6 +107,8 @@ const logger = (function(){
   function log(txt, obj) {
     clear();
     if(_level <= 0) return;
+    if(!console) return;
+
     let current = new Date();
     let prefix = `${current.getFullYear()}-${(current.getMonth()+1+'').padStart(2, '0')}-${(current.getDate()+'').padStart(2, '0')}T${(current.getHours()+'').padStart(2, '0')}:${(current.getMinutes()+'').padStart(2, '0')}:${(current.getSeconds()+'').padStart(2, '0')}.${(current.getMilliseconds()+'').padStart(3, '0')} : ${_name} : `;
     if(obj) console.log(prefix + txt, obj);
@@ -114,6 +116,11 @@ const logger = (function(){
   }
 
   return {
+    set config(_config) {
+      console.log('check config', _config);
+      if(_config.debug) _level = 1;
+      else _level = 0;
+    },
     active: (settingLevel = 1) => { _level = settingLevel; },
     deactive: () => { _level = 0; },
     get loggingLimit() { return _loggingLimit; },
@@ -124,6 +131,7 @@ const logger = (function(){
   }
 })();
 
+logger.name = 'background.js';
 logger.log('hello, background js');
 
 /* database config */
@@ -167,13 +175,14 @@ function onInstalledListener() {
       delegateServiceName: 'google',
       googleToLanguage : 'en',
       longmanToLanguage : '/',
+      witnessedComparatorKey : 'BY_COUNT_DESC',
       debug : true
     };
     logging.process('default config set');
     chrome.storage.sync.set({'config': config});
     chrome.storage.sync.get('config', function({config}) {
       logging.process('default config set check', config);
-      config.debug? logger.active():logger.deactive();
+      logger.config = config;
     });
     logging.done();
   }).then(() => {

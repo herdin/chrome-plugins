@@ -8,7 +8,7 @@
      * level > 1, not implements
      */
     let _level = 1;
-    let _name = 'deploy.js';
+    let _name = 'logger.js';
     function clear() {
       if(_loggingLimit > 0) {
         if(console && ++_loggingCount > _loggingLimit) {
@@ -20,6 +20,8 @@
     function log(txt, obj) {
       clear();
       if(_level <= 0) return;
+      if(!console) return;
+
       let current = new Date();
       let prefix = `${current.getFullYear()}-${(current.getMonth()+1+'').padStart(2, '0')}-${(current.getDate()+'').padStart(2, '0')}T${(current.getHours()+'').padStart(2, '0')}:${(current.getMinutes()+'').padStart(2, '0')}:${(current.getSeconds()+'').padStart(2, '0')}.${(current.getMilliseconds()+'').padStart(3, '0')} : ${_name} : `;
       if(obj) console.log(prefix + txt, obj);
@@ -27,6 +29,11 @@
     }
 
     return {
+      set config(_config) {
+        console.log('check config', _config);
+        if(_config.debug) _level = 1;
+        else _level = 0;
+      },
       active: (settingLevel = 1) => { _level = settingLevel; },
       deactive: () => { _level = 0; },
       get loggingLimit() { return _loggingLimit; },
@@ -37,14 +44,15 @@
     }
   })();
 
+  logger.name = 'deploy.js';
+  logger.log('hello, deploy.js');
+
   //in [options.js], must mathching with DELEGATE_SERVICE
   const DELEGATE_SERVICE = {
     GOOGLE: {
-      name: 'google',
       popupConfig: googlePopupConfigMaker
     },
     LONGMAN: {
-      name: 'longman',
       popupConfig: longmanPopupConfigMaker
     },
   };
@@ -61,10 +69,7 @@
 
   chrome.storage.sync.get('config', ({config}) => {
     logger.log('get config for init -> ', config);
-
-    config.debug?
-      logger.active():
-      logger.deactive();
+    logger.config = config;
 
     delayedConfig = config;
     pollingStorageForDelayedConfig();
@@ -163,7 +168,7 @@
     return {
       _searchTarget : '',
       set searchTarget(setSearchTarget) {
-        _searchTarget = setSearchTarget.toLowerCase();
+        _searchTarget = setSearchTarget;
       },
       get targetUrl() {
         return baseUrl + mode + _searchTarget;
@@ -182,7 +187,7 @@
        selectionResult.valid = false;
     } else {
       selectionResult.valid = true;
-      selectionResult.selection = selection.trim();
+      selectionResult.selection = selection.trim().toLowerCase();
     }
 
     logger.log('selection info', selectionResult);

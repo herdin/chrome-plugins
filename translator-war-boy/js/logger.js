@@ -18,6 +18,8 @@ const logger = (function(){
   function log(txt, obj) {
     clear();
     if(_level <= 0) return;
+    if(!console) return;
+
     let current = new Date();
     let prefix = `${current.getFullYear()}-${(current.getMonth()+1+'').padStart(2, '0')}-${(current.getDate()+'').padStart(2, '0')}T${(current.getHours()+'').padStart(2, '0')}:${(current.getMinutes()+'').padStart(2, '0')}:${(current.getSeconds()+'').padStart(2, '0')}.${(current.getMilliseconds()+'').padStart(3, '0')} : ${_name} : `;
     if(obj) console.log(prefix + txt, obj);
@@ -25,6 +27,11 @@ const logger = (function(){
   }
 
   return {
+    set config(_config) {
+      console.log('check config', _config);
+      if(_config.debug) _level = 1;
+      else _level = 0;
+    },
     active: (settingLevel = 1) => { _level = settingLevel; },
     deactive: () => { _level = 0; },
     get loggingLimit() { return _loggingLimit; },
@@ -36,8 +43,3 @@ const logger = (function(){
 })();
 
 logger.log('hello, logger');
-
-chrome.storage.sync.get('config', function({config}) {
-  logger.log('get config', config);
-  config.debug? logger.active():logger.deactive();
-});
