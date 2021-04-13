@@ -57,6 +57,10 @@ Every time You wonder how much You searched, using *Witnessed* menu.
 *******************
 * version history *
 *******************
+** version 1.4
+- bug fix
+- config sync
+- stability
 
 ** version 1.2
 - longman dictionary feature
